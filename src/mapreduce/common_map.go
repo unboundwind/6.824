@@ -5,6 +5,8 @@ import (
 	"io/ioutil"
 	"fmt"
 	"os"
+	"log"
+	"encoding/json"
 )
 
 // doMap manages one map task: it reads one of the input files
@@ -56,9 +58,39 @@ func doMap(
 	//
 	// Remember to close the file after you have written all the values!
 	//
-	file, err := os.Open(inFile)
+	fmt.Printf("Map: %s-map-%d\n", jobName, mapTaskNumber)
+	contents, err := ioutil.ReadFile(inFile)
 	if err != nil {
+		log.Fatalf("DoMap[%d]: read %s\n", mapTaskNumber, err)
+		return
+	}
+	mapResult := mapF(inFile, string(contents))
 
+	files := make([]*os.File, nReduce)
+	encoders := make([]*json.Encoder, nReduce)
+
+	for _, kv := range mapResult {
+		r := (ihash(kv.Key) % nReduce)
+		if files[r] == nil {
+			file, err := os.Create(reduceName(jobName, mapTaskNumber, r))
+			if err != nil {
+				log.Fatalf("DoMap[%d]: create %s\n", mapTaskNumber, err)
+			}
+			files[r] = file
+			encoders[r] = json.NewEncoder(file)
+		}
+
+		err := encoders[r].Encode(&kv)
+		if err != nil {
+			log.Fatalf("DoMap[%d]: encode %s, %#v\n", mapTaskNumber, err, kv)
+		}
+	}
+
+	for _, file := range files {
+		err := file.Close()
+		if err != nil {
+			log.Fatalf("DoMap[%d]: close %s\n", mapTaskNumber, err)
+		}
 	}
 }
 
