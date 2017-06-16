@@ -90,7 +90,7 @@ func check(t *testing.T, files []string) {
 func checkWorker(t *testing.T, l []int) {
 	for _, tasks := range l {
 		if tasks == 0 {
-			t.Fatalf("A worker didn't do any work\n")
+			t.Fatal("A worker didn't do any work\n")
 		}
 	}
 }
