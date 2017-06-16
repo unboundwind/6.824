@@ -3,7 +3,9 @@ package mapreduce
 import (
 	"fmt"
 	"sync"
+	"runtime"
 )
+
 
 //
 // schedule() starts and waits for all tasks in the given phase (Map
@@ -36,31 +38,41 @@ func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, re
 	// TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
 	//
 
+	workerChan := make(chan string, runtime.NumCPU())
+
+	go func() {
+		worker := <-registerChan
+		workerChan <- worker
+	}()
 	var group sync.WaitGroup
+	group.Add(ntasks)
 	for i := 0; i < ntasks; i++ {
-		group.Add(1)
+		worker := <-workerChan
 		switch phase {
 		case mapPhase:
-			go func () {
-				call(<- registerChan, "Worker.DoTask", &DoTaskArgs{
+			go func(jobName string, phase jobPhase, file string, taskNumber int) {
+				call(worker, "Worker.DoTask", &DoTaskArgs{
 					JobName: jobName,
-					File: mapFiles[i],
+					File: file,
 					Phase: phase,
-					TaskNumber: i,
+					TaskNumber: taskNumber,
 					NumOtherPhase: n_other}, nil)
-				defer group.Done()
-			}()
+				workerChan <- worker
+				group.Done()
+			}(jobName, phase, mapFiles[i], i)
 		case reducePhase:
-			go func () {
-				call(<- registerChan, "Work.DoTask", &DoTaskArgs{
+			go func(jobName string, phase jobPhase, taskNumber int) {
+				call(worker, "Worker.DoTask", &DoTaskArgs{
 					JobName: jobName,
 					Phase: phase,
-					TaskNumber: i,
+					TaskNumber: taskNumber,
 					NumOtherPhase: n_other}, nil)
-				defer group.Done()
-			}()
+				workerChan <- worker
+				group.Done()
+			}(jobName, phase, i)
 		}
 	}
 	group.Wait()
+	close(workerChan)
 	fmt.Printf("Schedule: %v phase done\n", phase)
 }
