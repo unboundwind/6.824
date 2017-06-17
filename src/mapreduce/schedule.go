@@ -68,7 +68,9 @@ func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, re
 				TaskNumber: i,
 				NumOtherPhase: n_other}
 		}
-		taskChan <- taskArgs
+		go func() {
+			taskChan <- taskArgs
+		}()
 	}
 	group.Wait()
 	finish <- true
