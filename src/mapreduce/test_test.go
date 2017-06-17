@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"math/rand"
+	"net"
 )
 
 const (
@@ -131,7 +132,21 @@ func port(suffix string) string {
 }
 
 func address() string {
-	return "127.0.0.1:" + strconv.Itoa(rand.Intn(10000) + 10000)
+	for {
+		addr := "127.0.0.1:" + strconv.Itoa(rand.Intn(10000) + 10000)
+		tcpAddr, err := net.ResolveTCPAddr("tcp4", addr)
+		if err != nil {
+			log.Fatalf("address: create %s\n", err)
+		}
+
+		conn, _ := net.DialTCP("tcp", nil, tcpAddr)
+		if conn == nil {
+			return addr
+		} else {
+			debug("random create address: %s is in user.\n", addr)
+			conn.Close()
+		}
+	}
 }
 
 func setup() *Master {
@@ -168,8 +183,6 @@ func TestSequentialMany(t *testing.T) {
 func TestBasic(t *testing.T) {
 	mr := setup()
 	for i := 0; i < 2; i++ {
-		//go RunWorker(mr.address, port("worker"+strconv.Itoa(i)),
-		//	MapFunc, ReduceFunc, -1)
 		go RunWorker(mr.address, address(), MapFunc, ReduceFunc, -1)
 	}
 	mr.Wait()

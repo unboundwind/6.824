@@ -90,6 +90,7 @@ func runTask(workerChan chan string, taskChan chan *DoTaskArgs, group *sync.Wait
 					workerChan <- worker
 					g.Done()
 				} else {
+					fmt.Printf("Schedule: call Worker %s do task %s #%d failed\n", worker, task.Phase, task.TaskNumber)
 					taskChan <- task
 				}
 			}(task)
