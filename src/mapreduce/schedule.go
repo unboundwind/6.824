@@ -37,7 +37,6 @@ func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, re
 
 	workerChan := make(chan string, runtime.NumCPU())
 	taskChan := make(chan *DoTaskArgs)
-	doneChan := make(chan bool)
 	finish := make(chan bool)
 
 	go func() {
@@ -46,14 +45,12 @@ func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, re
 			workerChan <- worker
 		}
 	}()
-	var group sync.WaitGroup
+
+	group := new(sync.WaitGroup)
 	group.Add(ntasks)
-	go runTask(workerChan, taskChan, doneChan, finish)
-	go func () {
-		for range doneChan {
-			group.Done()
-		}
-	}()
+
+	go runTask(workerChan, taskChan, group, finish)
+
 	for i := 0; i < ntasks; i++ {
 		var taskArgs *DoTaskArgs
 		switch phase {
@@ -78,7 +75,8 @@ func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, re
 	fmt.Printf("Schedule: %v phase done\n", phase)
 }
 
-func runTask(workerChan chan string, taskChan chan *DoTaskArgs, doneChan chan bool, finishChan chan bool) {
+func runTask(workerChan chan string, taskChan chan *DoTaskArgs, group *sync.WaitGroup, finishChan chan bool) {
+	g := group
 	loop:
 	for {
 		select {
@@ -88,7 +86,7 @@ func runTask(workerChan chan string, taskChan chan *DoTaskArgs, doneChan chan bo
 				ok := call(worker, "Worker.DoTask", task, nil)
 				if ok {
 					workerChan <- worker
-					doneChan <- true
+					g.Done()
 				} else {
 					taskChan <- task
 				}
