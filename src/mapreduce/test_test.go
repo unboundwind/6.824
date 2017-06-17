@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"math/rand"
 )
 
 const (
@@ -100,7 +101,7 @@ func makeInputs(num int) []string {
 	var names []string
 	var i = 0
 	for f := 0; f < num; f++ {
-		names = append(names, fmt.Sprintf("824-mrinput-%d.txt", f))
+		names = append(names, fmt.Sprintf("/tmp/mapreduce/824-mrinput-%d.txt", f))
 		file, err := os.Create(names[f])
 		if err != nil {
 			log.Fatal("mkInput: ", err)
@@ -129,9 +130,14 @@ func port(suffix string) string {
 	return s
 }
 
+func address() string {
+	return "127.0.0.1:" + strconv.Itoa(rand.Intn(10000) + 10000)
+}
+
 func setup() *Master {
 	files := makeInputs(nMap)
-	master := port("master")
+	//master := port("master")
+	master := address()
 	mr := Distributed("test", files, nReduce, master)
 	return mr
 }
@@ -162,8 +168,9 @@ func TestSequentialMany(t *testing.T) {
 func TestBasic(t *testing.T) {
 	mr := setup()
 	for i := 0; i < 2; i++ {
-		go RunWorker(mr.address, port("worker"+strconv.Itoa(i)),
-			MapFunc, ReduceFunc, -1)
+		//go RunWorker(mr.address, port("worker"+strconv.Itoa(i)),
+		//	MapFunc, ReduceFunc, -1)
+		go RunWorker(mr.address, address(), MapFunc, ReduceFunc, -1)
 	}
 	mr.Wait()
 	check(t, mr.files)
@@ -174,9 +181,9 @@ func TestBasic(t *testing.T) {
 func TestOneFailure(t *testing.T) {
 	mr := setup()
 	// Start 2 workers that fail after 10 tasks
-	go RunWorker(mr.address, port("worker"+strconv.Itoa(0)),
+	go RunWorker(mr.address, address(),
 		MapFunc, ReduceFunc, 10)
-	go RunWorker(mr.address, port("worker"+strconv.Itoa(1)),
+	go RunWorker(mr.address, address(),
 		MapFunc, ReduceFunc, -1)
 	mr.Wait()
 	check(t, mr.files)
@@ -196,10 +203,10 @@ func TestManyFailures(t *testing.T) {
 			break
 		default:
 			// Start 2 workers each sec. The workers fail after 10 tasks
-			w := port("worker" + strconv.Itoa(i))
+			w := address()
 			go RunWorker(mr.address, w, MapFunc, ReduceFunc, 10)
 			i++
-			w = port("worker" + strconv.Itoa(i))
+			w = address()
 			go RunWorker(mr.address, w, MapFunc, ReduceFunc, 10)
 			i++
 			time.Sleep(1 * time.Second)

@@ -34,45 +34,67 @@ func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, re
 	// them have been completed successfully should the function return.
 	// Remember that workers may fail, and that any given worker may finish
 	// multiple tasks.
-	//
-	// TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
-	//
 
 	workerChan := make(chan string, runtime.NumCPU())
+	taskChan := make(chan *DoTaskArgs)
+	doneChan := make(chan bool)
+	finish := make(chan bool)
 
 	go func() {
-		worker := <-registerChan
-		workerChan <- worker
+		for {
+			worker := <-registerChan
+			workerChan <- worker
+		}
 	}()
 	var group sync.WaitGroup
 	group.Add(ntasks)
+	go runTask(workerChan, taskChan, doneChan, finish)
+	go func () {
+		for range doneChan {
+			group.Done()
+		}
+	}()
 	for i := 0; i < ntasks; i++ {
-		worker := <-workerChan
+		var taskArgs *DoTaskArgs
 		switch phase {
 		case mapPhase:
-			go func(jobName string, phase jobPhase, file string, taskNumber int) {
-				call(worker, "Worker.DoTask", &DoTaskArgs{
-					JobName: jobName,
-					File: file,
-					Phase: phase,
-					TaskNumber: taskNumber,
-					NumOtherPhase: n_other}, nil)
-				workerChan <- worker
-				group.Done()
-			}(jobName, phase, mapFiles[i], i)
+			taskArgs = &DoTaskArgs{
+				JobName: jobName,
+				File: mapFiles[i],
+				Phase: phase,
+				TaskNumber: i,
+				NumOtherPhase: n_other}
 		case reducePhase:
-			go func(jobName string, phase jobPhase, taskNumber int) {
-				call(worker, "Worker.DoTask", &DoTaskArgs{
-					JobName: jobName,
-					Phase: phase,
-					TaskNumber: taskNumber,
-					NumOtherPhase: n_other}, nil)
-				workerChan <- worker
-				group.Done()
-			}(jobName, phase, i)
+			taskArgs = &DoTaskArgs{
+				JobName: jobName,
+				Phase: phase,
+				TaskNumber: i,
+				NumOtherPhase: n_other}
 		}
+		taskChan <- taskArgs
 	}
 	group.Wait()
-	close(workerChan)
+	finish <- true
 	fmt.Printf("Schedule: %v phase done\n", phase)
+}
+
+func runTask(workerChan chan string, taskChan chan *DoTaskArgs, doneChan chan bool, finishChan chan bool) {
+	loop:
+	for {
+		select {
+		case task := <-taskChan:
+			go func (task *DoTaskArgs) {
+				worker := <-workerChan
+				ok := call(worker, "Worker.DoTask", task, nil)
+				if ok {
+					workerChan <- worker
+					doneChan <- true
+				} else {
+					taskChan <- task
+				}
+			}(task)
+		case <-finishChan:
+			break loop
+		}
+	}
 }
