@@ -3,11 +3,11 @@ package main
 import (
 	"fmt"
 	"mapreduce"
-	"os"
 	"unicode"
 	"strconv"
 	"log"
 	"strings"
+	"os"
 )
 
 //
@@ -18,11 +18,10 @@ import (
 // of key/value pairs.
 //
 func mapF(filename string, contents string) []mapreduce.KeyValue {
-	// TODO: you have to write this function
 	var kvs []mapreduce.KeyValue
 
 	words := strings.FieldsFunc(contents, func(r rune) bool {
-		return unicode.IsLetter(r)
+		return unicode.IsSpace(r)
 	})
 
 	for _, word := range words {
@@ -38,7 +37,6 @@ func mapF(filename string, contents string) []mapreduce.KeyValue {
 // any map task.
 //
 func reduceF(key string, values []string) string {
-	// TODO: you also have to write this function
 	var num int
 	for _, v := range values {
 		i, err := strconv.Atoi(v)
