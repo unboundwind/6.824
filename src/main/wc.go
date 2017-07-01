@@ -21,7 +21,7 @@ func mapF(filename string, contents string) []mapreduce.KeyValue {
 	var kvs []mapreduce.KeyValue
 
 	words := strings.FieldsFunc(contents, func(r rune) bool {
-		return unicode.IsSpace(r)
+		return !unicode.IsLetter(r)
 	})
 
 	for _, word := range words {
