@@ -7,7 +7,6 @@ import (
 	"strings"
 	"unicode"
 	"strconv"
-	"bytes"
 )
 
 // The mapping function is called once for each piece of the input.
@@ -15,14 +14,16 @@ import (
 // and the value is the file's contents. The return value should be a slice of
 // key/value pairs, each represented by a mapreduce.KeyValue.
 func mapF(document string, value string) (res []mapreduce.KeyValue) {
-	// TODO: you should complete this to do the inverted index challenge
-
+	wordMap := make(map[string]bool)
 	words := strings.FieldsFunc(value, func(r rune) bool {
 		return !unicode.IsLetter(r)
 	})
 
 	for _, word := range words {
-		res = append(res, mapreduce.KeyValue{Key: word, Value: document})
+		if _, ok := wordMap[word]; !ok {
+			wordMap[word] = true
+			res = append(res, mapreduce.KeyValue{Key: word, Value: document})
+		}
 	}
 
 	return res
@@ -32,23 +33,7 @@ func mapF(document string, value string) (res []mapreduce.KeyValue) {
 // list of that key's string value (merged across all inputs). The return value
 // should be a single output value for that key.
 func reduceF(key string, values []string) string {
-	docMap := make(map[string]string)
-	buf := &bytes.Buffer{}
-	count := 0
-
-	buf.WriteString(" ")
-	for i, doc := range values {
-		if _, ok := docMap[doc]; !ok {
-			if i != 0 {
-				buf.WriteString(",")
-			}
-			docMap[doc] = ""
-			buf.WriteString(doc)
-			count++
-		}
-	}
-
-	return strconv.Itoa(count) + buf.String()
+	return strconv.Itoa(len(values)) + " " + strings.Join(values, ",")
 }
 
 // Can be run in 3 ways:
