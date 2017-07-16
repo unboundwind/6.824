@@ -30,11 +30,6 @@ func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, re
 
 	fmt.Printf("Schedule: %v %v tasks (%d I/Os)\n", ntasks, phase, n_other)
 
-	// All ntasks tasks have to be scheduled on workers, and only once all of
-	// them have been completed successfully should the function return.
-	// Remember that workers may fail, and that any given worker may finish
-	// multiple tasks.
-
 	workerChan := make(chan string, runtime.NumCPU())
 	taskChan := make(chan *DoTaskArgs)
 	finish := make(chan bool)
