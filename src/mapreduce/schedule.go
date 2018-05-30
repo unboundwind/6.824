@@ -3,7 +3,6 @@ package mapreduce
 import (
 	"fmt"
 	"sync"
-	"runtime"
 )
 
 
@@ -17,55 +16,44 @@ import (
 // existing registered workers (if any) and new ones as they register.
 //
 func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, registerChan chan string) {
-	var ntasks int
-	var n_other int // number of inputs (for reduce) or outputs (for map)
+	var nTasks int
+	var nOther int // number of inputs (for reduce) or outputs (for map)
 	switch phase {
 	case mapPhase:
-		ntasks = len(mapFiles)
-		n_other = nReduce
+		nTasks = len(mapFiles)
+		nOther = nReduce
 	case reducePhase:
-		ntasks = nReduce
-		n_other = len(mapFiles)
+		nTasks = nReduce
+		nOther = len(mapFiles)
 	}
 
-	fmt.Printf("Schedule: %v %v tasks (%d I/Os)\n", ntasks, phase, n_other)
+	fmt.Printf("Schedule: %v %v tasks (%d I/Os)\n", nTasks, phase, nOther)
 
-	workerChan := make(chan string, runtime.NumCPU())
 	taskChan := make(chan *DoTaskArgs)
 	finish := make(chan bool)
-
-	go func() {
-		for {
-			worker := <-registerChan
-			workerChan <- worker
-		}
-	}()
-
 	group := new(sync.WaitGroup)
-	group.Add(ntasks)
 
-	go runTask(workerChan, taskChan, group, finish)
+	group.Add(nTasks)
+	go runTask(registerChan, taskChan, group, finish)
 
-	for i := 0; i < ntasks; i++ {
+	for i := 0; i < nTasks; i++ {
 		var taskArgs *DoTaskArgs
 		switch phase {
 		case mapPhase:
 			taskArgs = &DoTaskArgs{
-				JobName: jobName,
-				File: mapFiles[i],
-				Phase: phase,
-				TaskNumber: i,
-				NumOtherPhase: n_other}
+				JobName:       jobName,
+				File:          mapFiles[i],
+				Phase:         phase,
+				TaskNumber:    i,
+				NumOtherPhase: nOther}
 		case reducePhase:
 			taskArgs = &DoTaskArgs{
-				JobName: jobName,
-				Phase: phase,
-				TaskNumber: i,
-				NumOtherPhase: n_other}
+				JobName:       jobName,
+				Phase:         phase,
+				TaskNumber:    i,
+				NumOtherPhase: nOther}
 		}
-		go func() {
-			taskChan <- taskArgs
-		}()
+		taskChan <- taskArgs
 	}
 	group.Wait()
 	finish <- true
@@ -85,7 +73,8 @@ func runTask(workerChan chan string, taskChan chan *DoTaskArgs, group *sync.Wait
 					g.Done()
 					workerChan <- worker
 				} else {
-					fmt.Printf("Schedule: call Worker %s do task %s #%d failed\n", worker, task.Phase, task.TaskNumber)
+					fmt.Printf("Schedule: call Worker %s do task %s #%d failed\n",
+								worker, task.Phase, task.TaskNumber)
 					taskChan <- task
 				}
 			}(task)
